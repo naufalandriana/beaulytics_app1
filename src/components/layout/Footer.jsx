@@ -67,7 +67,9 @@ const Footer = () => {
         <Copyright>© {currentYear} Beaulytics. All rights reserved.</Copyright>
         <PaymentMethods>
           <span>Payment Methods:</span>
-          <img src="/images/payment-methods.png" alt="Payment methods" />
+          <img src="/assets/images/page/footer/paypal.png" alt="Paypal Logo" />
+          <img src="/assets/images/page/footer/card.png" alt="Mastercard Logo" />
+          <img src="/assets/images/page/footer/visa.png" alt="Visa Logo" />
         </PaymentMethods>
       </FooterBottom>
     </FooterContainer>
