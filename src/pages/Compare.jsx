@@ -10,8 +10,8 @@ import { useCompare } from '../context/CompareContext';
 // Import components
 import CompareItem from '../components/compare/CompareItem';
 
-// API base URL
-const API_BASE_URL = 'http://localhost:5000/api';
+// Import Supabase client
+import { productService } from '../lib/supabaseClient';
 
 const Compare = () => {
   // Use compare context
@@ -24,21 +24,15 @@ const Compare = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Load all products for filtering from API
+  // Load all products for filtering from Supabase
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        const response = await fetch(`${API_BASE_URL}/productsv2`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        const productsArray = Array.isArray(data) ? data : data.products || data.data || [];
+        // Fetch all products from Supabase
+        const productsArray = await productService.getAllProducts();
         
         setAllProducts(productsArray);
         setFilteredProducts(productsArray);
@@ -82,9 +76,14 @@ const Compare = () => {
   const getAllIngredients = () => {
     const allIngredients = new Set();
     compareList.forEach(product => {
-      if (product.ingredients && Array.isArray(product.ingredients)) {
-        product.ingredients.forEach(ingredient => {
-          allIngredients.add(ingredient);
+      // Handle both array format and comma-separated string format
+      if (product.ingredients) {
+        const ingredients = Array.isArray(product.ingredients) 
+          ? product.ingredients 
+          : product.ingredients.split(',').map(ingredient => ingredient.trim());
+        
+        ingredients.forEach(ingredient => {
+          if (ingredient) allIngredients.add(ingredient);
         });
       }
     });
@@ -95,9 +94,14 @@ const Compare = () => {
   const getAllSkinTypes = () => {
     const allSkinTypes = new Set();
     compareList.forEach(product => {
-      if (product.skinType && Array.isArray(product.skinType)) {
-        product.skinType.forEach(type => {
-          allSkinTypes.add(type);
+      // Handle both array format and comma-separated string format
+      if (product.skin_type) {
+        const skinTypes = Array.isArray(product.skin_type) 
+          ? product.skin_type 
+          : product.skin_type.split(',').map(type => type.trim());
+        
+        skinTypes.forEach(type => {
+          if (type) allSkinTypes.add(type);
         });
       }
     });
@@ -108,13 +112,51 @@ const Compare = () => {
   const getAllConcerns = () => {
     const allConcerns = new Set();
     compareList.forEach(product => {
-      if (product.concerns && Array.isArray(product.concerns)) {
-        product.concerns.forEach(concern => {
-          allConcerns.add(concern);
+      // Handle both array format and comma-separated string format
+      if (product.concerns) {
+        const concerns = Array.isArray(product.concerns) 
+          ? product.concerns 
+          : product.concerns.split(',').map(concern => concern.trim());
+        
+        concerns.forEach(concern => {
+          if (concern) allConcerns.add(concern);
         });
       }
     });
     return Array.from(allConcerns).sort();
+  };
+  
+  // Helper function to check if product has specific ingredient
+  const hasIngredient = (product, ingredient) => {
+    if (!product.ingredients) return false;
+    
+    const ingredients = Array.isArray(product.ingredients) 
+      ? product.ingredients 
+      : product.ingredients.split(',').map(ing => ing.trim());
+    
+    return ingredients.includes(ingredient);
+  };
+  
+  // Helper function to check if product has specific skin type
+  const hasSkinType = (product, skinType) => {
+    if (!product.skin_type) return false;
+    
+    const skinTypes = Array.isArray(product.skin_type) 
+      ? product.skin_type 
+      : product.skin_type.split(',').map(type => type.trim());
+    
+    return skinTypes.includes(skinType);
+  };
+  
+  // Helper function to check if product addresses specific concern
+  const hasConcern = (product, concern) => {
+    if (!product.concerns) return false;
+    
+    const concerns = Array.isArray(product.concerns) 
+      ? product.concerns 
+      : product.concerns.split(',').map(con => con.trim());
+    
+    return concerns.includes(concern);
   };
   
   return (
@@ -179,7 +221,7 @@ const Compare = () => {
               <RowLabel>Price</RowLabel>
               {compareList.map(product => (
                 <RowValue key={`price-${product.id}`} highlight>
-                  Rp {product.price.toLocaleString('id-ID', { minimumFractionDigits: 0 })}
+                  Rp {(product.price || 0).toLocaleString('id-ID', { minimumFractionDigits: 0 })}
                 </RowValue>
               ))}
               {Array.from({ length: 3 - compareList.length }).map((_, index) => (
@@ -196,7 +238,7 @@ const Compare = () => {
                   <RowLabel>{skinType.charAt(0).toUpperCase() + skinType.slice(1)}</RowLabel>
                   {compareList.map(product => (
                     <RowValue key={`skintype-${product.id}-${skinType}`}>
-                      {product.skinType && product.skinType.includes(skinType) ? 
+                      {hasSkinType(product, skinType) ? 
                         <CompatibilityDot compatible /> : 
                         <CompatibilityDot />}
                     </RowValue>
@@ -217,7 +259,7 @@ const Compare = () => {
                   <RowLabel>{concern.charAt(0).toUpperCase() + concern.slice(1)}</RowLabel>
                   {compareList.map(product => (
                     <RowValue key={`concern-${product.id}-${concern}`}>
-                      {product.concerns && product.concerns.includes(concern) ? 
+                      {hasConcern(product, concern) ? 
                         <CompatibilityDot compatible /> : 
                         <CompatibilityDot />}
                     </RowValue>
@@ -238,7 +280,7 @@ const Compare = () => {
                   <RowLabel>{ingredient}</RowLabel>
                   {compareList.map(product => (
                     <RowValue key={`ingredient-${product.id}-${ingredient}`}>
-                      {product.ingredients && product.ingredients.includes(ingredient) ? 
+                      {hasIngredient(product, ingredient) ? 
                         <CompatibilityDot compatible /> : 
                         <CompatibilityDot />}
                     </RowValue>
@@ -256,7 +298,7 @@ const Compare = () => {
             {compareList.map(product => (
               <HowToUseCard key={`howtouse-${product.id}`}>
                 <h4>{product.name}</h4>
-                <p>{product.howToUse || 'No usage instructions available.'}</p>
+                <p>{product.how_to_use || product.howToUse || 'No usage instructions available.'}</p>
               </HowToUseCard>
             ))}
           </CompareSection>
@@ -321,7 +363,7 @@ const Compare = () => {
                         whileHover={{ backgroundColor: 'var(--light-gray)' }}
                       >
                         <ProductListImage 
-                          src={product.image || `/images/products/placeholder.jpg`} 
+                          src={product.image_url || product.image || `/images/products/placeholder.jpg`} 
                           alt={product.name || 'Product'}
                           onError={(e) => {
                             e.target.src = `/images/products/placeholder.jpg`;
@@ -329,7 +371,7 @@ const Compare = () => {
                         />
                         <ProductListInfo>
                           <h4>{product.name || 'Unnamed Product'}</h4>
-                          Rp {product.price.toLocaleString('id-ID', { minimumFractionDigits: 0 })}
+                          <p>Rp {(product.price || 0).toLocaleString('id-ID', { minimumFractionDigits: 0 })}</p>
                         </ProductListInfo>
                       </ProductListItem>
                     ))
